@@ -11,12 +11,14 @@ BASE_URL = "https://api.telegram.org/bot455477447:" + TOKEN + "/sendMessage?chat
 cuisines_kboard = [["We're Done Choosing!"], ["American", "Burgers"], ["Fast Food", "Japanese"], ["Pizza", "Sushi"],
                        ["Asian Fusion", "Cafes"], ["Indian", "Korean"], ["Sandwiches", "Thai"],
                        ["Breakfast", "Chinese"], ["Italian", "Noodles"], ["Seafood", "Vietnamese"]]
-dietary_kboard = [["We're Done Choosing!"], ["Other (Send me a message and specify)"], ["Vegetarian", "Vegan"],
+dietary_kboard = [["We're Done Choosing!"], ["Other (Please specify)", "None"], ["Vegetarian", "Vegan"],
                   ["Peanut", "Lactose"], ["Egg", "Wheat"], ["Soy", "Shellfish"]]
 price_kboard = [["We're Done Choosing!"], ["$", "$$"], ["$$$", "$$$$"]]
 location_kboard = [["We're Done Choosing!"], ["Downtown Vancouver", "West End"], ["Kitsilano", "Olympic Village"],
                   ["Burnaby", "Richmond"], ["North Vancouver", "East Vancouver"]]
-more_options_kboard = [["More Restaurant Recommendations!"]]
+more_options_kboard = [["More Restaurant Recommendations!", "Thanks, we're done!"]]
+eval_kboard = [["Rate Me"], ["Help us with new restaurant suggestions"]]
+rate_kboard = [["1", "2", "3", "4", "5"]]
 
 
 script_flow = [
@@ -36,6 +38,9 @@ script_flow = [
     [False, "https://www.yelp.com/biz/burgoo-bistro-vancouver"],
     [False, "https://www.yelp.com/biz/the-wolf-and-hound-vancouver"],
     [False, "https://www.yelp.com/biz/the-diner-vancouver"],
+    [False, "Have a great dinner!"],
+    [True, "Feel free to let me know how I did :)", eval_kboard],
+    [True, "Rate 1-5, how intuitive was the bot?", rate_kboard]
 ]
 
 
@@ -91,7 +96,7 @@ def run_bot():
     """
     queue_len = len(script_flow)
     for i, msgs in enumerate(script_flow):
-        input("ENTER for next message in the queue (" + str(i) + "/" + str(queue_len) + ")\n")
+        input("ENTER for next message in the queue (" + str(i + 1) + "/" + str(queue_len) + ")\n")
         if msgs[0]:
             keyboard = build_keyboard(description=msgs[1], custom_keyboard=msgs[2])
             res = _post_request(data=keyboard)
