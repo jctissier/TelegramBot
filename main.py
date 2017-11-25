@@ -1,11 +1,12 @@
 import requests
 import json
+import time
 
 
 # Telegram Bot URL
-TOKEN = "AAGWCtS8NMnUquWkY9yiTIcMIEv1y12u8IE"
-CHAT_ID = "-263054020"
-BASE_URL = "https://api.telegram.org/bot455477447:" + TOKEN + "/sendMessage?chat_id=" + CHAT_ID + "&"
+TOKEN = "AAGWCtS8NMnUquWkY9yiTIcMIEv1y12u8IE"   # TODO - is the token always the same
+CHAT_ID = "-263054020"                          # TODO - Get the chat ID and pass it as a variable
+BASE_URL = "https://api.telegram.org/bot455477447:{token}/sendMessage?chat_id={chat}".format(token=TOKEN, chat=CHAT_ID)
 
 # Customized Keyboards
 cuisines_kboard = [["We're Done Choosing!"], ["American", "Burgers"], ["Fast Food", "Japanese"], ["Pizza", "Sushi"],
@@ -30,18 +31,22 @@ script_flow = [
     [True, "What location should I search in?", location_kboard],
     [False, "Got it. Let me think…"],
     [False, "I have found these places so far…"],
-    [True, "Let me know if you want more options", more_options_kboard],
     [False, "https://www.yelp.com/biz/mercante-vancouver-2"],
     [False, "https://www.yelp.com/biz/my-home-cuisine-vancouver"],
     [False, "https://www.yelp.com/biz/school-of-fish-vancouver"],
+    [True, "Let me know if you want more options", more_options_kboard],
     [False, "Here are more recommendations based on your preferences"],
     [False, "https://www.yelp.com/biz/burgoo-bistro-vancouver"],
     [False, "https://www.yelp.com/biz/the-wolf-and-hound-vancouver"],
     [False, "https://www.yelp.com/biz/the-diner-vancouver"],
     [False, "Have a great dinner!"],
     [True, "Feel free to let me know how I did :)", eval_kboard],
-    [True, "Rate 1-5, how intuitive was the bot?", rate_kboard]
+    [True, "Rate 1-5, how intuitive was the bot?", rate_kboard],
+    [None]
 ]
+
+
+"""HTTP Requests to chat: GET for text messages, POST for customized keyboards """
 
 
 def _get_request(msg_text):
@@ -49,40 +54,37 @@ def _get_request(msg_text):
 
 
 def _post_request(data):
-    return requests.post(BASE_URL, data=data)
+    return requests.post(url=BASE_URL, data=data)
 
 
 def check_response(response):
     if response.status_code == 200:
-        print("Message sent: " + str(response.status_code) + "\n")
+        print("Message sent: {code}\n".format(code=response.status_code))
     else:
-        print("Message failed: " + str(response.status_code))
-        print(response.content)
+        print("Message failed: {code}\n{content}".format(code=response.status_code, content=response.content))
 
 
 """Functions for the keyboard buttons"""
 
 
 def build_keyboard(description, custom_keyboard):
-    data = format_message(text=description, reply_markup=custom_keyboard)
+    data = {
+        'text': description,
+        'reply_markup': json.dumps(to_dict(custom_keyboard))
+    }
 
     return data
-
-
-def format_message(text, reply_markup):
-    return {
-        'text': text,
-        'reply_markup': json.dumps(to_dict(reply_markup))
-    }
 
 
 def to_dict(keyboard):
-    data = {'keyboard': []}
-
+    keyboard_data = {'keyboard': []}
     for row in keyboard:
-        data['keyboard'].append([button.to_dict() if hasattr(button, 'to_dict') else button for button in row])
+        keyboard_data['keyboard'].append([button.to_dict() if hasattr(button, 'to_dict') else button for button in row])
 
-    return data
+    return keyboard_data
+
+
+"""Script entry"""
 
 
 def run_bot():
@@ -94,17 +96,86 @@ def run_bot():
             msgs[1] = Text                                                  {String}
             msgs[2] = Keyboard values                                       {List}
     """
+    chat_updates = GetChatUpdates()                         # creates queue of latest chat ids
+
     queue_len = len(script_flow)
     for i, msgs in enumerate(script_flow):
-        input("ENTER for next message in the queue (" + str(i + 1) + "/" + str(queue_len) + ")\n")
-        if msgs[0]:
+        print("Message in queue: (" + str(i + 1) + "/" + str(queue_len) + ")")
+
+        if msgs[0] is None:
+            exit("\n*****\nScript is complete\n*****\n")
+        elif msgs[0]:
             keyboard = build_keyboard(description=msgs[1], custom_keyboard=msgs[2])
             res = _post_request(data=keyboard)
+            chat_updates.wait_till_done()
         else:
             res = _get_request(msg_text=msgs[1])
         check_response(response=res)
 
-    print("*****\nScript is complete\n*****\n")
+
+class GetChatUpdates:
+    """
+    Polls chat server until user completion has been selected
+    """
+    latest_id = 0
+
+    def __init__(self):
+        self.set_chat_id()
+
+    def _get_chat_history(self):
+        updates_url = "https://api.telegram.org/bot455477447:{token}/getUpdates?offset={last_id}".format(
+            token=TOKEN,
+            last_id=self.latest_id
+        )
+        data = {'timeout': 0, 'limit': 100}
+
+        return requests.post(updates_url, data=data, timeout=float(30.) + float(0))
+
+    def set_chat_id(self):
+        res = self._get_chat_history()
+
+        if res.status_code == 200:
+            last_id = [res['update_id'] for res in res.json()['result']][-1]
+            self.latest_id = last_id
+            print("Latest chat ID has been set to: {last_id}".format(last_id=last_id))
+
+        else:
+            print("Error in request: {code}\n{content}".format(code=res.status_code, content=res.json()))
+            self.latest_id = 0
+
+    def poll_chat_history(self):
+        res = self._get_chat_history()
+
+        if res.status_code == 200:
+            last_msg = [[res['update_id'], res['message']['text']] for res in res.json()['result']][-1]
+
+            if self.is_done_trigger(msg=last_msg[1]) and self.latest_id != last_msg[0]:
+                self.latest_id = last_msg[0]
+                return True
+
+            return False
+
+        else:
+            print("Error in request: {code}\n{content}".format(code=res.status_code, content=res.json()))
+            return False
+
+    def wait_till_done(self):
+        is_done = self.poll_chat_history()
+        if is_done:
+            return
+        else:
+            print("Polling chat till finished")
+            time.sleep(0.5)
+            self.wait_till_done()
+
+    @staticmethod
+    def is_done_trigger(msg):
+        done_msgs = ["We're Done Choosing!", "Thanks, we're done!", "More Restaurant Recommendations!", "Rate Me"]
+        evaluation_ratings = ["1", "2", "3", "4", "5"]
+        if msg in done_msgs or msg in evaluation_ratings:
+            return True
+
+        return False
 
 
 if __name__ == "__main__":
