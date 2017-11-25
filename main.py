@@ -100,17 +100,18 @@ def run_bot():
 
     queue_len = len(script_flow)
     for i, msgs in enumerate(script_flow):
-        print("Message in queue: (" + str(i + 1) + "/" + str(queue_len) + ")")
+        print("\nMessage in queue: (" + str(i + 1) + "/" + str(queue_len) + ")")
 
         if msgs[0] is None:
             exit("\n*****\nScript is complete\n*****\n")
         elif msgs[0]:
             keyboard = build_keyboard(description=msgs[1], custom_keyboard=msgs[2])
             res = _post_request(data=keyboard)
+            check_response(response=res)
             chat_updates.wait_till_done()
         else:
             res = _get_request(msg_text=msgs[1])
-        check_response(response=res)
+            check_response(response=res)
 
 
 class GetChatUpdates:
