@@ -4,8 +4,8 @@ import time
 
 
 # Telegram Bot URL
-TOKEN = "AAGWCtS8NMnUquWkY9yiTIcMIEv1y12u8IE"   # TODO - is the token always the same
-CHAT_ID = "-263054020"                          # TODO - Get the chat ID and pass it as a variable
+TOKEN = ""   # TODO - is the token always the same
+CHAT_ID = ""                          # TODO - Get the chat ID and pass it as a variable
 BASE_URL = "https://api.telegram.org/bot455477447:{token}/sendMessage?chat_id={chat}".format(token=TOKEN, chat=CHAT_ID)
 
 # Customized Keyboards
